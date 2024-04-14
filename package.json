@@ -1,8 +1,10 @@
 {
   "name": "vscode-pixel-art-player",
-  "displayName": "vscode-pixel-art-player",
+  "displayName": "コードアート",
   "description": "A simple Japanese pixel art player for vscode",
   "version": "0.0.1",
+  "icon": "icons/icon.gif",
+  "publisher": "rqm",
   "repository": {
     "type": "git",
     "url": "https://github.com/rqm/vscode-pixel-art-player"
