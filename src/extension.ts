@@ -43,6 +43,10 @@ class GIFPlayerPanelProvider implements vscode.WebviewViewProvider {
 					// Switch to the next GIF when the image is clicked
 					this.switchToNextImage(webviewView);
 					break;
+				case 'imageRightClicked':
+					// Switch to the previous GIF when the image is right clicked
+					this.switchToPreviousImage(webviewView);
+					break;
 			}
 		});
 	}
@@ -54,6 +58,12 @@ class GIFPlayerPanelProvider implements vscode.WebviewViewProvider {
 
 	private switchToNextImage(webviewView: vscode.WebviewView) {
 		this._currentImageIndex = (this._currentImageIndex + 1) % this._gifFiles.length;
+		const mediaUri = this.getImageUri(webviewView, this._currentImageIndex);
+		webviewView.webview.postMessage({ type: 'updateImage', uri: mediaUri.toString() });
+	}
+
+	private switchToPreviousImage(webviewView: vscode.WebviewView) {
+		this._currentImageIndex = (this._currentImageIndex - 1 + this._gifFiles.length) % this._gifFiles.length;
 		const mediaUri = this.getImageUri(webviewView, this._currentImageIndex);
 		webviewView.webview.postMessage({ type: 'updateImage', uri: mediaUri.toString() });
 	}
@@ -88,13 +98,20 @@ function getWebviewContent(mediaUri: vscode.Uri) {
 			<script>
 				const vscode = acquireVsCodeApi();
 
-				function imageClicked() {
-					// Send message to extension when image is clicked
-					vscode.postMessage({ type: 'imageClicked' });
-				}
-
 				// Attach click event listener to the image
-				document.getElementById('gif').addEventListener('click', imageClicked);
+				document.getElementById('gif').addEventListener(
+					'click',
+					() => vscode.postMessage({ type: 'imageClicked' })
+				);
+
+				// Attach right click event listener to the image
+				document.getElementById('gif').addEventListener(
+					'contextmenu',
+					(e) => {
+						e.preventDefault();
+						vscode.postMessage({ type: 'imageRightClicked' })
+					}
+				);
 
 				// Listen for messages from the extension
 				window.addEventListener('message', event => {
