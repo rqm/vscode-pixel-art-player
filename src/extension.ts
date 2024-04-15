@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
-	const provider = new GIFPlayerPanelProvider(context.extensionUri);
+	const provider = new GIFPlayerPanelProvider(context, context.extensionUri);
 
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
@@ -13,13 +13,19 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 class GIFPlayerPanelProvider implements vscode.WebviewViewProvider {
-	private _currentImageIndex = 0;
+	private _currentImageIndex: number = 0;
 	private _gifFiles: string[] = [];
 
-	constructor(private readonly _extensionUri: vscode.Uri) {
+	constructor(
+		private readonly _extensionContext: vscode.ExtensionContext,
+		private readonly _extensionUri: vscode.Uri,
+	) {
 		// Load GIF files from the media folder
 		const mediaPath = vscode.Uri.joinPath(this._extensionUri, 'media');
 		this._gifFiles = fs.readdirSync(mediaPath.fsPath).filter(file => file.endsWith('.gif'));
+
+		// Retrieve the last saved index from the global state
+		this._currentImageIndex = this._extensionContext.globalState.get('currentImageIndex') || 0;
 	}
 
 	public resolveWebviewView(
@@ -35,6 +41,16 @@ class GIFPlayerPanelProvider implements vscode.WebviewViewProvider {
 
 		// Render the webview with the first GIF
 		this.renderWebview(webviewView);
+
+		// Restore webview from state when visibility changes
+		webviewView.onDidChangeVisibility(
+			() => {
+				// Retrieve the last saved index from the global state
+				this._currentImageIndex = this._extensionContext.globalState.get('currentImageIndex') || 0;
+				// Re-render the webview
+				this.renderWebview(webviewView);
+			}
+		);
 
 		// Handle messages from the webview
 		webviewView.webview.onDidReceiveMessage(message => {
@@ -60,16 +76,22 @@ class GIFPlayerPanelProvider implements vscode.WebviewViewProvider {
 		this._currentImageIndex = (this._currentImageIndex + 1) % this._gifFiles.length;
 		const mediaUri = this.getImageUri(webviewView, this._currentImageIndex);
 		webviewView.webview.postMessage({ type: 'updateImage', uri: mediaUri.toString() });
+		this.saveCurrentImageIndex();
 	}
 
 	private switchToPreviousImage(webviewView: vscode.WebviewView) {
 		this._currentImageIndex = (this._currentImageIndex - 1 + this._gifFiles.length) % this._gifFiles.length;
 		const mediaUri = this.getImageUri(webviewView, this._currentImageIndex);
 		webviewView.webview.postMessage({ type: 'updateImage', uri: mediaUri.toString() });
+		this.saveCurrentImageIndex();
 	}
 
 	private getImageUri(webviewView: vscode.WebviewView, index: number): vscode.Uri {
 		return webviewView.webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', this._gifFiles[index]));
+	}
+
+	private saveCurrentImageIndex() {
+		this._extensionContext.globalState.update('currentImageIndex', this._currentImageIndex);
 	}
 }
 
